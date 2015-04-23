@@ -43,7 +43,7 @@ for file in filenames:
 		# Add halo to dictionary
 		testHalo = Halo(halo)
 		if( testHalo.id in haloList ):
-			print "Existing halo " + str(testHalo.id) + " found"
+			print "Existing halo " + str(testHalo.id) + " found" # This dosen't happen
 		else:
 			haloList[testHalo.id] = testHalo
 		
@@ -53,18 +53,17 @@ for file in filenames:
 			
 			haloClusters[testHalo.pid] = haloList[testHalo.pid]
 			
-		if( testHalo.id == trackedHaloID ):
-			if( testHalo.desc_id != -1 ):
-				trackedHaloID = testHalo.desc_id
-				print "Halo " + str(testHalo.id) + " now following " + str(trackedHaloID)
-				
-				trackedPosX.append( testHalo.position[0] );
-				trackedPosY.append( testHalo.position[1] );
-				trackedPosZ.append( testHalo.position[2] );
+		if( testHalo.desc_id != -1 ):
+			for initHaloID in initialHalos:
+				if( initialHalos[initHaloID].nextDesc_id == testHalo.id ):
+					initialHalos[initHaloID].trackedPosX.append( testHalo.position[0] )
+					initialHalos[initHaloID].trackedPosY.append( testHalo.position[1] )
+					initialHalos[initHaloID].trackedPosZ.append( testHalo.position[2] )
+					initialHalos[initHaloID].nextDesc_id = testHalo.desc_id
 				
 		if( initialFile == True ):
 			initialHalos[testHalo.id] = testHalo
-		
+			initialHalos[testHalo.id].nextDesc_id = testHalo.desc_id
 	initialFile = False
 
 print "Loaded " + str(len(haloList)) + " halos"
@@ -103,10 +102,11 @@ p = fig.gca(projection='3d')
 p.set_xlabel( "X" )
 p.set_ylabel( "Y" )
 p.set_zlabel( "Z" )
-	
-#mpl.rcParams['legend.fontsize'] = 10
-#title = "RK4 - Seed: " + str(seed) + " StepSize: " + str(step_size) + " nSteps: "+str(len(result))
-#p.plot(x, y, z, label=title)
-p.plot(trackedPosX, trackedPosY, trackedPosZ)
+mpl.rcParams['legend.fontsize'] = 10
+for initHaloID in initialHalos:
+	curHalo = initialHalos[initHaloID]
+	title = str(curHalo.id)
+	p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+
 p.legend()
 plt.show()

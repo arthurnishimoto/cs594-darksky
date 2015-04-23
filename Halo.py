@@ -59,3 +59,8 @@ class Halo:
 		self.clients = {}
 		self.positions = []
 		self.rootHaloID = -1
+		
+		self.nextDesc_id = -1
+		self.trackedPosX = []
+		self.trackedPosY = []
+		self.trackedPosZ = []
