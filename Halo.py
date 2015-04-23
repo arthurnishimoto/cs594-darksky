@@ -57,3 +57,5 @@ class Halo:
 		self.Acc_Rate_Tdyn = data[63]
 		
 		self.clients = {}
+		self.positions = []
+		self.rootHaloID = -1
