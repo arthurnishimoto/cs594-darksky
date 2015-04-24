@@ -64,3 +64,8 @@ class Halo:
 		self.trackedPosX = []
 		self.trackedPosY = []
 		self.trackedPosZ = []
+		
+		self.trackedVelX = []
+		self.trackedVelY = []
+		self.trackedVelZ = []
+		
