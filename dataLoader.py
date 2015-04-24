@@ -91,7 +91,21 @@ for i in haloClusters:
 	childCount = len(haloClusters[i].clients)
 	if( childCount > 15 ):
 		print "Halo id: "+str(i) + " " + str(childCount)
-		
+
+# Write halo positions
+resultsPath = "./results/"
+for initHaloID in initialHalos:
+	curhalo = initialHalos[initHaloID]
+	f = open('positions_halo_'+str(initHaloID), 'w')
+	print len(curhalo.trackedPosX)
+	print len(curhalo.trackedPosY)
+	print len(curhalo.trackedPosZ)
+	for i in curhalo.trackedPosX:
+		x = curhalo.trackedPosX[int(i)]
+		y = curhalo.trackedPosY[int(i)]
+		z = curhalo.trackedPosZ[int(i)]
+		f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
+	f.close()
 # Topic 8 assignment 1 plotting code
 fig = plt.figure()
 	
