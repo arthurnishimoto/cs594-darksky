@@ -1,3 +1,10 @@
+# haloViewer.py
+# Description: loads the halo list, renders as streamlines or points over time
+#
+# Class: CS 594 - Spring 2015
+# System: Windows 8.1, Python 2.7.8 (Anaconda 2.1.0 - x64), VTK 6.1.0 (x64)
+# Author: Arthur Nishimoto (anishi2)
+
 import thingking as tk  # loadtxt
 import os
 import matplotlib.pyplot as plt
@@ -7,13 +14,41 @@ import matplotlib as mpl
 from Halo import Halo
 from mpl_toolkits.mplot3d import Axes3D
 
+# Settings ------------------------------------------------------------------------
+# Number of timesteps deep to connect descendant halos to parent
+# i.e. depth 0 will only track the ~58 halos that appear in the first file
+# i.e. depth 1 will only track the halos that first appear in the first two files
+maxDepth = 0
 
+# File index number of the starting file and ending file to read
+startFile = 0
+endFileIndex = 100 # there are 88 files total
+
+plotRK4 = False # Process velocities using RK4 instead of using the provided position data
+euler = False # Process velocities using euler instead of RK4 (Requires plotRK4 to be enabled)
+
+# Render as an animation over time instead of showing all timesteps as a streamline
+showOverTime = False
+
+# If showOverTime == true, also show previous timesteps instead of drawing only the current position
+showPrevTimeTrails = False
+
+# Start/end time of the animation 
+startTime = 0
+endTime = 100 # there are 88 files total
+
+# Write halo positions
+writeToFile = False
+
+# Globals --------------------------------------------------------------------------
 haloList = {}
 haloClusters = {}
 initialHalos = {}
 initialFile = True
 
 # Load the data -------------------------------------------------------------------
+# Loads in the files and tracks halo descendant IDs of the host halo and allows the host
+# halo to track the position of all decendant halos over time 
 def loadData(maxDepth, startFileIndex, endFileIndex):
 	global haloList
 	global haloClusters
@@ -69,13 +104,13 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 
 # Topic 8: Assignment 1 -----------------------------------------------------------
 def RK4(seed, step_size, num_steps, u, v, w):
+	global euler
 	print "\nRK4 start:"
 		
 	# Do stuff
 	curPos = seed;
 	flowPos = []
-	
-	euler = False
+
 	for step in range(0, num_steps):
 		if( step >= len(u) ):
 			break
@@ -127,7 +162,7 @@ def RK4(seed, step_size, num_steps, u, v, w):
 	return flowPos
 	
 # Program Specific ----- -----------------------------------------------------------
-loadData(0, 0, 100)
+loadData(maxDepth, startFile, endFileIndex)
 
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
@@ -155,9 +190,6 @@ print "Avg " + str(avgChildren)
 #	if( childCount > 15 ):
 #		print "Halo id: "+str(i) + " " + str(childCount)
 
-# Write halo positions
-writeToFile = False
-
 if( writeToFile ):
 	resultsPath = "./results/"
 	for initHaloID in initialHalos:
@@ -170,7 +202,7 @@ if( writeToFile ):
 			f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
 		f.close()
 
-plotRK4 = False
+
 
 print "Tracked " + str(len(initialHalos))
 count = 0
@@ -178,8 +210,8 @@ count = 0
 # Not showing over time, don't bother to render more frames
 if( showOverTime == False ):
 	startTime = 0
-	endTime = 0
-
+	endTime = 1
+	
 for t in range(startTime, endTime):
 	fig = plt.figure()
 	
@@ -226,9 +258,12 @@ for t in range(startTime, endTime):
 		#if(count > 100):
 		#	break
 	
+	# use this to spin the plot
+	#p.view_init(elev=10., azim=t)
+	
 	# Save figure
 	print "Generating figure: " + str(t)
-	plt.savefig("movie"+str(t)+".png", transparent=True)
+	plt.savefig("figure_"+str(t)+".png", transparent=True)
 	
 	# Clear plot for next time stamp
 	plt.clf() # Clears plots

@@ -1,3 +1,10 @@
+# Halo.py
+# Description: Container class for storing halo information
+#
+# Class: CS 594 - Spring 2015
+# System: Windows 8.1, Python 2.7.8 (Anaconda 2.1.0 - x64), VTK 6.1.0 (x64)
+# Author: Arthur Nishimoto (anishi2)
+
 class Halo:
     def __init__(self, data):
 		self.data = "hello";
