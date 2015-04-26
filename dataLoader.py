@@ -14,7 +14,7 @@ initialHalos = {}
 initialFile = True
 
 # Load the data -------------------------------------------------------------------
-def loadData():
+def loadData(maxDepth, startFileIndex, endFileIndex):
 	global haloList
 	global haloClusters
 	global initialHalos
@@ -22,9 +22,16 @@ def loadData():
 	
 	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
 	filenames = os.listdir(PATH) # returns list
-
+	
+	initialDepthCount = 0
+	currentFileIndex = 0
 	for file in filenames:
-		print "Loading file: '"+ file + "'"
+		if( startFileIndex > currentFileIndex or currentFileIndex > endFileIndex ):
+			currentFileIndex = currentFileIndex + 1
+			continue
+		print "Loading file: "+str(currentFileIndex)+" '"+ file + "'"
+		currentFileIndex = currentFileIndex + 1
+		
 		data = tk.loadtxt(PATH+file)
 
 		for halo in data:
@@ -40,7 +47,7 @@ def loadData():
 				haloList[testHalo.pid].clients[testHalo.id] = testHalo
 				
 				haloClusters[testHalo.pid] = haloList[testHalo.pid]
-				
+
 			if( testHalo.desc_id != -1 ):
 				for initHaloID in initialHalos:
 					if( initialHalos[initHaloID].nextDesc_id == testHalo.id ):
@@ -53,38 +60,29 @@ def loadData():
 						initialHalos[initHaloID].trackedVelZ.append( testHalo.velocity[2] )
 						
 						initialHalos[initHaloID].nextDesc_id = testHalo.desc_id
-					
-			if( initialFile == True ):
+			#else:
+			if( initialDepthCount <= maxDepth ):
 				initialHalos[testHalo.id] = testHalo
 				initialHalos[testHalo.id].nextDesc_id = testHalo.desc_id
+		initialDepthCount = initialDepthCount + 1
 		initialFile = False
 
 # Topic 8: Assignment 1 -----------------------------------------------------------
-def RK4(self, seed, step_size, num_steps, u, v, w):
+def RK4(seed, step_size, num_steps, u, v, w):
 	print "\nRK4 start:"
-	
-	# Check if seed is within volume boundary
-	validSeed = True
-	if( seed[0] < 0 or seed[0] >= u.shape[0] ):
-		print "Seed X value "+str(seed[0])+" out of bounds"
-		validSeed = False
-	if( seed[1] < 0 or seed[1] >= v.shape[1] ):
-		print "Seed Y value "+str(seed[1])+" out of bounds"
-		validSeed = False
-	if( seed[2] < 0 or seed[2] >= w.shape[2] ):
-		print "Seed Z value "+str(seed[2])+" out of bounds"
-		validSeed = False
-		
-	if( validSeed == False ):
-		print "Valid Volume Boundaries: 0 - " + str(w.shape[2]-1)
-		return
 		
 	# Do stuff
 	curPos = seed;
 	flowPos = []
 	
+	euler = False
 	for step in range(0, num_steps):
-		velAtCurPos = [u[int(curPos[0])][int(curPos[1])][int(curPos[2])], v[int(curPos[0])][int(curPos[1])][int(curPos[2])], w[int(curPos[0])][int(curPos[1])][int(curPos[2])]]
+		if( step >= len(u) ):
+			break
+			
+		scale = 0.0001
+		
+		velAtCurPos = [scale * u[step], scale * v[step], scale * w[step]]
 		
 		ex = curPos[0] + velAtCurPos[0] * step_size
 		ey = curPos[1] + velAtCurPos[1] * step_size
@@ -95,39 +93,32 @@ def RK4(self, seed, step_size, num_steps, u, v, w):
 		a = velAtCurPos * step_size * 2
 		
 		# b = v(p0+a/2) * 2 dt
-		bu = (velAtCurPos[0] + u[int(a[0])][int(a[1])][int(a[2])]/2) * step_size * 2
-		bv = (velAtCurPos[1] + v[int(a[0])][int(a[1])][int(a[2])]/2) * step_size * 2
-		bw = (velAtCurPos[2] + w[int(a[0])][int(a[1])][int(a[2])]/2) * step_size * 2
+		bu = (velAtCurPos[0] + a[0]/2) * step_size * 2
+		bv = (velAtCurPos[1] + a[1]/2) * step_size * 2
+		bw = (velAtCurPos[2] + a[2]/2) * step_size * 2
 		b = [bu, bv, bw]
 		
 		# c = v(p0+b/2) * 2 dt
-		cu = (velAtCurPos[0] + u[int(b[0])][int(b[1])][int(b[2])]/2) * step_size * 2
-		cv = (velAtCurPos[1] + v[int(b[0])][int(b[1])][int(b[2])]/2) * step_size * 2
-		cw = (velAtCurPos[2] + w[int(b[0])][int(b[1])][int(b[2])]/2) * step_size * 2
+		cu = (velAtCurPos[0] + b[0]/2) * step_size * 2
+		cv = (velAtCurPos[1] + b[1]/2) * step_size * 2
+		cw = (velAtCurPos[2] + b[2]/2) * step_size * 2
 		c = [cu, cv, cw]
 		
 		# d = v(p0+c/2) * 2 dt
-		du = (velAtCurPos[0] + u[int(c[0])][int(c[1])][int(c[2])]/2) * step_size * 2
-		dv = (velAtCurPos[1] + v[int(c[0])][int(c[1])][int(c[2])]/2) * step_size * 2
-		dw = (velAtCurPos[2] + w[int(c[0])][int(c[1])][int(c[2])]/2) * step_size * 2
+		du = (velAtCurPos[0] + c[0]/2) * step_size * 2
+		dv = (velAtCurPos[1] + c[1]/2) * step_size * 2
+		dw = (velAtCurPos[2] + c[2]/2) * step_size * 2
 		d = [du, dv, dw]
+		
 		
 		x2 = curPos[0] + (a[0] + 2 * b[0] + 2 * c[0] + d[0]) / 6
 		y2 = curPos[1] + (a[1] + 2 * b[1] + 2 * c[1] + d[1]) / 6
 		z2 = curPos[2] + (a[2] + 2 * b[2] + 2 * c[2] + d[2]) / 6
 		
-		nexPos = [x2,y2,z2]
-			
-		# Check that next position is in volume
-		if( nexPos[0] < 0 or nexPos[0] >= u.shape[0] ):
-			print "Position out of bounds on step " + str(step) + " of max: " + str(num_steps)
-			break
-		if( nexPos[1] < 0 or nexPos[1] >= v.shape[1] ):
-			print "Position out of bounds on step " + str(step) + " of max: " + str(num_steps)
-			break
-		if( nexPos[2] < 0 or nexPos[2] >= w.shape[2] ):
-			print "Position out of bounds on step " + str(step) + " of max: " + str(num_steps)
-			break
+		if( euler ):
+			nexPos = ePos
+		else:
+			nexPos = [x2,y2,z2]
 		
 		flowPos.append(nexPos)
 		
@@ -136,7 +127,7 @@ def RK4(self, seed, step_size, num_steps, u, v, w):
 	return flowPos
 	
 # Program Specific ----- -----------------------------------------------------------
-loadData()
+loadData(0, 0, 100)
 
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
@@ -179,25 +170,72 @@ if( writeToFile ):
 			f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
 		f.close()
 
-# Topic 8 assignment 1 plotting code
-fig = plt.figure()
-	
-p = fig.gca(projection='3d')
-#p.set_xlim(0, 48)
-#p.set_ylim(0, 48)
-#p.set_zlim(0, 48)
-p.set_xlabel( "X" )
-p.set_ylabel( "Y" )
-p.set_zlabel( "Z" )
-mpl.rcParams['legend.fontsize'] = 10
-for initHaloID in initialHalos:
-	curHalo = initialHalos[initHaloID]
-	title = str(curHalo.id)
-	p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+plotRK4 = False
 
+print "Tracked " + str(len(initialHalos))
+count = 0
+
+showOverTime = False
+showPrevTimeTrails = False
+startTime = 0
+endTime = 1000
+
+for t in range(startTime, endTime):
+	fig = plt.figure()
+	
+	p = fig.gca(projection='3d')
+	#p.set_xlim(0, 48)
+	#p.set_ylim(0, 48)
+	#p.set_zlim(0, 48)
+	p.set_xlabel( "X" )
+	p.set_ylabel( "Y" )
+	p.set_zlabel( "Z" )
+	mpl.rcParams['legend.fontsize'] = 10
+
+	for initHaloID in initialHalos:
+		curHalo = initialHalos[initHaloID]
+		
+		# RK4
+		if( plotRK4 ):
+			initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
+			rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
+			
+			# Format for plot
+			rk4x = []
+			rk4y = []
+			rk4z = []
+			for index in range(0,len(rk4pos)):
+				rk4x.append(rk4pos[index][0])
+				rk4y.append(rk4pos[index][1])
+				rk4z.append(rk4pos[index][2])
+				
+			title = str(curHalo.id) + " (RK4)"
+			p.plot(rk4x, rk4y, rk4z, label=title)
+		else:
+			title = str(curHalo.id) + ""
+			
+			# Plot time from 0 to time t
+			if( showOverTime ):
+				if( showPrevTimeTrails ):
+					p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
+				else:
+					p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
+			else:
+				p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+		count = count + 1
+		#if(count > 100):
+		#	break
+	
+	# Save figure
+	print "Generating figure: " + str(t)
+	plt.savefig("movie"+str(t)+".png", transparent=True)
+	
+	# Clear plot for next time stamp
+	plt.clf() # Clears plots
+	
 # Potentially used for rendering multiple images
 #for ii in xrange(0,360,1):
-#        ax.view_init(elev=10., azim=ii)
- #       savefig("movie"%ii+".png")
-p.legend()
-plt.show()
+#	p.view_init(elev=10., azim=ii)
+#	plt.savefig("movie"+str(ii)+".png", transparent=True)
+#p.legend()
+#plt.show()
