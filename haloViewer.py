@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
+import sys
 
 from Halo import Halo
 from mpl_toolkits.mplot3d import Axes3D
@@ -24,14 +25,14 @@ maxDepth = 0
 startFile = 0
 endFileIndex = 100 # there are 88 files total
 
-plotRK4 = False # Process velocities using RK4 instead of using the provided position data
+plotRK4 = True # Process velocities using RK4 instead of using the provided position data
 euler = False # Process velocities using euler instead of RK4 (Requires plotRK4 to be enabled)
 
 # Render as an animation over time instead of showing all timesteps as a streamline
-showOverTime = False
+showOverTime = True
 
 # If showOverTime == true, also show previous timesteps instead of drawing only the current position
-showPrevTimeTrails = False
+showPrevTimeTrails = True
 
 # Start/end time of the animation 
 startTime = 0
@@ -43,8 +44,6 @@ writeToFile = False
 # Globals --------------------------------------------------------------------------
 haloList = {}
 haloClusters = {}
-initialHalos = {}
-initialFile = True
 
 # Load the data -------------------------------------------------------------------
 # Loads in the files and tracks halo descendant IDs of the host halo and allows the host
@@ -52,56 +51,62 @@ initialFile = True
 def loadData(maxDepth, startFileIndex, endFileIndex):
 	global haloList
 	global haloClusters
-	global initialHalos
-	global initialFile
+
+	initialHalos = {}
 	
 	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
-	filenames = os.listdir(PATH) # returns list
+	#filenames = os.listdir(PATH) # returns list
 	
+	#PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	filenames = []
+	for i in range(12, 99):
+		filenames.append("hlist_0."+str(i)+"000.list")
+		#print PATH+"hlist_0."+str(i)+"000.list"
+	filenames.append("hlist_1.00000.list")
+
 	initialDepthCount = 0
 	currentFileIndex = 0
 	for file in filenames:
-		if( startFileIndex > currentFileIndex or currentFileIndex > endFileIndex ):
+		if(startFileIndex > currentFileIndex or currentFileIndex > endFileIndex):
 			currentFileIndex = currentFileIndex + 1
 			continue
+
 		print "Loading file: "+str(currentFileIndex)+" '"+ file + "'"
 		currentFileIndex = currentFileIndex + 1
-		
 		data = tk.loadtxt(PATH+file)
 
 		for halo in data:
 			# Add halo to dictionary
-			testHalo = Halo(halo)
-			if( testHalo.id in haloList ):
-				print "Existing halo " + str(testHalo.id) + " found" # This dosen't happen
+			curHalo = Halo(halo)
+			if( curHalo.id in haloList ):
+				print "Existing halo " + str(curHalo.id) + " found" # This dosen't happen
 			else:
-				haloList[testHalo.id] = testHalo
+				haloList[curHalo.id] = curHalo
 			
 			# If halo has a host ID, append it to the host halos's client list
-			if( testHalo.pid in haloList ):
-				haloList[testHalo.pid].clients[testHalo.id] = testHalo
+			if( curHalo.pid in haloList ):
+				haloList[curHalo.pid].clients[curHalo.id] = curHalo
 				
-				haloClusters[testHalo.pid] = haloList[testHalo.pid]
+				haloClusters[curHalo.pid] = haloList[curHalo.pid]
 
-			if( testHalo.desc_id != -1 ):
-				for initHaloID in initialHalos:
-					if( initialHalos[initHaloID].nextDesc_id == testHalo.id ):
-						initialHalos[initHaloID].trackedPosX.append( testHalo.position[0] )
-						initialHalos[initHaloID].trackedPosY.append( testHalo.position[1] )
-						initialHalos[initHaloID].trackedPosZ.append( testHalo.position[2] )
+			#if( curHalo.desc_id != -1 ):
+			for initHaloID in initialHalos:
+				if( initialHalos[initHaloID].nextDesc_id == curHalo.id ):
+					initialHalos[initHaloID].trackedPosX.append( curHalo.position[0] )
+					initialHalos[initHaloID].trackedPosY.append( curHalo.position[1] )
+					initialHalos[initHaloID].trackedPosZ.append( curHalo.position[2] )
+							
+					initialHalos[initHaloID].trackedVelX.append( curHalo.velocity[0] )
+					initialHalos[initHaloID].trackedVelY.append( curHalo.velocity[1] )
+					initialHalos[initHaloID].trackedVelZ.append( curHalo.velocity[2] )
 						
-						initialHalos[initHaloID].trackedVelX.append( testHalo.velocity[0] )
-						initialHalos[initHaloID].trackedVelY.append( testHalo.velocity[1] )
-						initialHalos[initHaloID].trackedVelZ.append( testHalo.velocity[2] )
-						
-						initialHalos[initHaloID].nextDesc_id = testHalo.desc_id
-			#else:
+					initialHalos[initHaloID].nextDesc_id = curHalo.desc_id
 			if( initialDepthCount <= maxDepth ):
-				initialHalos[testHalo.id] = testHalo
-				initialHalos[testHalo.id].nextDesc_id = testHalo.desc_id
+				initialHalos[curHalo.id] = curHalo
+				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
 		initialDepthCount = initialDepthCount + 1
-		initialFile = False
-
+	return initialHalos
+	
 # Topic 8: Assignment 1 -----------------------------------------------------------
 def RK4(seed, step_size, num_steps, u, v, w):
 	global euler
@@ -162,33 +167,61 @@ def RK4(seed, step_size, num_steps, u, v, w):
 	return flowPos
 	
 # Program Specific ----- -----------------------------------------------------------
-loadData(maxDepth, startFile, endFileIndex)
+#loadData(maxDepth, startFile, endFileIndex)
+if len(sys.argv) == 2:
+	nPartitions = int(sys.argv[1])
+else:
+	print "Expecting 2 arguments: program, nPartitions"
+	print "Received " + str(len(sys.argv))
+	sys.exit("Ending application")
+	
+print 'nPartitions:', nPartitions
 
+filenames = []
+for i in range(12, 100):
+	filenames.append("hlist_0."+str(i)+"000.list")
+filenames.append("hlist_1.00000.list")
+
+segmentsPerProcess = len(filenames) / nPartitions
+currentPart = 0
+processAssignments = {}
+for i in range(0,nPartitions):
+	print "Process " + str(i) + " will read data part " + str(currentPart) + " through " + str(currentPart+segmentsPerProcess)
+	processAssignments[i] = [currentPart, currentPart+segmentsPerProcess]
+	currentPart = currentPart+segmentsPerProcess+1
+
+# haloParts = {}
+# for assignmentID in processAssignments:
+	# assignment = processAssignments[assignmentID]
+	# print "Process: " + str(assignmentID)
+	# haloParts[assignmentID] = loadData(0, assignment[0], assignment[1])
+
+# mergedHalos = haloParts[0]
+# previousHaloList = mergedHalos
+# for haloPartID in haloParts:
+	# if( haloPartID > 0 ):
+		# curHaloPart = haloParts[haloPartID]
+		# print "Merge Process result: " + str(haloPartID)
+		# for curHaloID in previousHaloList:
+			# curHalo = previousHaloList[curHaloID]
+			# if( curHaloPart[curHalo.nextDesc_id] != None ):
+				# if( curHalo.rootHaloID != -1 ):
+					# #print "Merged halo " + str(curHalo.nextDesc_id) + " with host " +  str(curHaloID)
+					# #print "Root " + str(curHaloPart[curHalo.nextDesc_id].nextDesc_id)
+					# mergedHalos[curHalo.rootHaloID].trackedPosX.extend( curHaloPart[curHalo.nextDesc_id].trackedPosX )
+					# mergedHalos[curHalo.rootHaloID].trackedPosY.extend( curHaloPart[curHalo.nextDesc_id].trackedPosY )
+					# mergedHalos[curHalo.rootHaloID].trackedPosZ.extend( curHaloPart[curHalo.nextDesc_id].trackedPosZ )
+				# else:
+					# #print "Added halo "+ str(curHaloID)
+					# mergedHalos[curHaloID] = curHalo
+					# mergedHalos[curHaloID] = curHalo
+					# mergedHalos[curHaloID] = curHalo
+				# curHaloPart[curHalo.nextDesc_id].rootHaloID = curHaloID
+		# previousHaloList = curHaloPart
+#initialHalos = mergedHalos
+initialHalos = loadData(100, 0, 100)
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
-
-# Calculate min/max/avg child count
-maxChildren = 0
-minChildren = 9999999999999999999999
-avgChildren = 0
-for i in haloClusters:
-	childCount = len(haloClusters[i].clients)
-	if( childCount > maxChildren ):
-		maxChildren = childCount
-	if( childCount < minChildren ):
-		minChildren = childCount	
-	avgChildren += childCount
-
-avgChildren = avgChildren / len(haloClusters)
-
-print "Max " + str(maxChildren)
-print "Min " + str(minChildren)
-print "Avg " + str(avgChildren)
-
-#for i in haloClusters:
-#	childCount = len(haloClusters[i].clients)
-#	if( childCount > 15 ):
-#		print "Halo id: "+str(i) + " " + str(childCount)
 
 if( writeToFile ):
 	resultsPath = "./results/"
@@ -201,11 +234,6 @@ if( writeToFile ):
 			z = curhalo.trackedPosZ[int(i)]
 			f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
 		f.close()
-
-
-
-print "Tracked " + str(len(initialHalos))
-count = 0
 
 # Not showing over time, don't bother to render more frames
 if( showOverTime == False ):
@@ -254,9 +282,6 @@ for t in range(startTime, endTime):
 					p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
 			else:
 				p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
-		count = count + 1
-		#if(count > 100):
-		#	break
 	
 	# use this to spin the plot
 	#p.view_init(elev=10., azim=t)
@@ -267,10 +292,3 @@ for t in range(startTime, endTime):
 	
 	# Clear plot for next time stamp
 	plt.clf() # Clears plots
-	
-# Potentially used for rendering multiple images
-#for ii in xrange(0,360,1):
-#	p.view_init(elev=10., azim=ii)
-#	plt.savefig("movie"+str(ii)+".png", transparent=True)
-#p.legend()
-#plt.show()
