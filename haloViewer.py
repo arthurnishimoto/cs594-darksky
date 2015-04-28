@@ -29,10 +29,12 @@ plotRK4 = True # Process velocities using RK4 instead of using the provided posi
 euler = False # Process velocities using euler instead of RK4 (Requires plotRK4 to be enabled)
 
 # Render as an animation over time instead of showing all timesteps as a streamline
-showOverTime = True
+showOverTime = False
 
 # If showOverTime == true, also show previous timesteps instead of drawing only the current position
 showPrevTimeTrails = True
+
+spinPlot = True
 
 # Start/end time of the animation 
 startTime = 0
@@ -51,7 +53,7 @@ haloClusters = {}
 def loadData(maxDepth, startFileIndex, endFileIndex):
 	global haloList
 	global haloClusters
-
+	global spinPlot
 	initialHalos = {}
 	
 	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
@@ -70,11 +72,20 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 		if(startFileIndex > currentFileIndex or currentFileIndex > endFileIndex):
 			currentFileIndex = currentFileIndex + 1
 			continue
-
+		fig = plt.figure()
+		p = fig.gca(projection='3d')
+		p.set_xlim(10, 50)
+		p.set_ylim(10, 50)
+		p.set_zlim(10, 50)
+		p.set_xlabel( "X" )
+		p.set_ylabel( "Y" )
+		p.set_zlabel( "Z" )
+		mpl.rcParams['legend.fontsize'] = 10
+	
 		print "Loading file: "+str(currentFileIndex)+" '"+ file + "'"
-		currentFileIndex = currentFileIndex + 1
 		data = tk.loadtxt(PATH+file)
-
+		
+		rk4pos = []
 		for halo in data:
 			# Add halo to dictionary
 			curHalo = Halo(halo)
@@ -99,18 +110,43 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 					initialHalos[initHaloID].trackedVelX.append( curHalo.velocity[0] )
 					initialHalos[initHaloID].trackedVelY.append( curHalo.velocity[1] )
 					initialHalos[initHaloID].trackedVelZ.append( curHalo.velocity[2] )
-						
+					
 					initialHalos[initHaloID].nextDesc_id = curHalo.desc_id
+					
+					initPos = [initialHalos[initHaloID].trackedPosX[0],initialHalos[initHaloID].trackedPosY[0], initialHalos[initHaloID].trackedPosZ[0]];
+					rk4pos = RK4( initPos, 1, 1000, initialHalos[initHaloID].trackedVelX, initialHalos[initHaloID].trackedVelY, initialHalos[initHaloID].trackedVelZ );
+					
+					# Format for plot
+					rk4x = []
+					rk4y = []
+					rk4z = []
+					for index in range(0,len(rk4pos)):
+						rk4x.append(rk4pos[index][0])
+						rk4y.append(rk4pos[index][1])
+						rk4z.append(rk4pos[index][2])
+					p.plot(rk4x[0:currentFileIndex], rk4y[0:currentFileIndex], rk4z[0:currentFileIndex])
+
 			if( initialDepthCount <= maxDepth ):
 				initialHalos[curHalo.id] = curHalo
 				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
+
+		if( spinPlot ):
+			p.view_init(elev=10., azim= currentFileIndex / 100.0 * 360)
+		else:
+			p.view_init(elev=10., azim=33)
+		
+		# Save figure
+		print "Generating figure: " + str(currentFileIndex)
+		plt.savefig("figure_"+str(currentFileIndex)+".png", transparent=True)
+		
 		initialDepthCount = initialDepthCount + 1
+		currentFileIndex = currentFileIndex + 1
 	return initialHalos
 	
 # Topic 8: Assignment 1 -----------------------------------------------------------
 def RK4(seed, step_size, num_steps, u, v, w):
 	global euler
-	print "\nRK4 start:"
+	#print "\nRK4 start:"
 		
 	# Do stuff
 	curPos = seed;
@@ -219,9 +255,10 @@ for i in range(0,nPartitions):
 				# curHaloPart[curHalo.nextDesc_id].rootHaloID = curHaloID
 		# previousHaloList = curHaloPart
 #initialHalos = mergedHalos
-initialHalos = loadData(100, 0, 100)
+initialHalos = loadData(3, 0, 100)
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
+print "Tracking " + str(len(initialHalos)) + " halos"
 
 if( writeToFile ):
 	resultsPath = "./results/"
@@ -235,60 +272,66 @@ if( writeToFile ):
 			f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
 		f.close()
 
-# Not showing over time, don't bother to render more frames
-if( showOverTime == False ):
-	startTime = 0
-	endTime = 1
+# for t in range(startTime, endTime):
+	# fig = plt.figure()
 	
-for t in range(startTime, endTime):
-	fig = plt.figure()
-	
-	p = fig.gca(projection='3d')
-	#p.set_xlim(0, 48)
-	#p.set_ylim(0, 48)
-	#p.set_zlim(0, 48)
-	p.set_xlabel( "X" )
-	p.set_ylabel( "Y" )
-	p.set_zlabel( "Z" )
-	mpl.rcParams['legend.fontsize'] = 10
+	# p = fig.gca(projection='3d')
+	# p.set_xlim(10, 50)
+	# p.set_ylim(10, 50)
+	# p.set_zlim(10, 50)
+	# p.set_xlabel( "X" )
+	# p.set_ylabel( "Y" )
+	# p.set_zlabel( "Z" )
+	# mpl.rcParams['legend.fontsize'] = 10
 
-	for initHaloID in initialHalos:
-		curHalo = initialHalos[initHaloID]
+	# for initHaloID in initialHalos:
+		# curHalo = initialHalos[initHaloID]
 		
-		# RK4
-		if( plotRK4 ):
-			initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
-			rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
+		# # RK4
+		# if( plotRK4 ):
+			# initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
+			# rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
 			
-			# Format for plot
-			rk4x = []
-			rk4y = []
-			rk4z = []
-			for index in range(0,len(rk4pos)):
-				rk4x.append(rk4pos[index][0])
-				rk4y.append(rk4pos[index][1])
-				rk4z.append(rk4pos[index][2])
+			# # Format for plot
+			# rk4x = []
+			# rk4y = []
+			# rk4z = []
+			# for index in range(0,len(rk4pos)):
+				# rk4x.append(rk4pos[index][0])
+				# rk4y.append(rk4pos[index][1])
+				# rk4z.append(rk4pos[index][2])
 				
-			title = str(curHalo.id) + " (RK4)"
-			p.plot(rk4x, rk4y, rk4z, label=title)
-		else:
-			title = str(curHalo.id) + ""
+			# title = str(curHalo.id) + " (RK4)"
 			
-			# Plot time from 0 to time t
-			if( showOverTime ):
-				if( showPrevTimeTrails ):
-					p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
-				else:
-					p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
-			else:
-				p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+			# if( showOverTime ):
+				# if( showPrevTimeTrails ):
+					# p.plot(rk4x[0:t], rk4y[0:t], rk4z[0:t], label=title)
+				# else:
+					# p.plot(rk4x[t], rk4y[t], rk4z[t], label=title)
+			# else:
+				# p.plot(rk4x, rk4y, rk4z, label=title)
+				
+		# else:
+			# title = str(curHalo.id) + ""
+			
+			# # Plot time from 0 to time t
+			# if( showOverTime ):
+				# if( showPrevTimeTrails ):
+					# p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
+				# else:
+					# p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
+			# else:
+				# p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
 	
-	# use this to spin the plot
-	#p.view_init(elev=10., azim=t)
+	# # use this to spin the plot
+	# if( spinPlot ):
+		# p.view_init(elev=10., azim= t / 100.0 * 360)
+	# else:
+		# p.view_init(elev=10., azim=33)
+		
+	# # Save figure
+	# print "Generating figure: " + str(t)
+	# plt.savefig("figure_"+str(t)+".png", transparent=True)
 	
-	# Save figure
-	print "Generating figure: " + str(t)
-	plt.savefig("figure_"+str(t)+".png", transparent=True)
-	
-	# Clear plot for next time stamp
-	plt.clf() # Clears plots
+	# # Clear plot for next time stamp
+	# plt.clf() # Clears plots
