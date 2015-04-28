@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 import sys
+import datetime
 
 from Halo import Halo
 from mpl_toolkits.mplot3d import Axes3D
@@ -22,7 +23,7 @@ from mpl_toolkits.mplot3d import Axes3D
 maxDepth = 0
 
 # File index number of the starting file and ending file to read
-startFile = 0
+startFileIndex = 0
 endFileIndex = 100 # there are 88 files total
 
 plotRK4 = True # Process velocities using RK4 instead of using the provided position data
@@ -34,7 +35,7 @@ showOverTime = False
 # If showOverTime == true, also show previous timesteps instead of drawing only the current position
 showPrevTimeTrails = True
 
-spinPlot = True
+spinPlot = False
 
 # Start/end time of the animation 
 startTime = 0
@@ -46,6 +47,8 @@ writeToFile = False
 # Globals --------------------------------------------------------------------------
 haloList = {}
 haloClusters = {}
+fig = plt.figure()
+p = fig.gca(projection='3d')
 
 # Load the data -------------------------------------------------------------------
 # Loads in the files and tracks halo descendant IDs of the host halo and allows the host
@@ -54,17 +57,21 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 	global haloList
 	global haloClusters
 	global spinPlot
+	global p
+	
 	initialHalos = {}
 	
 	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
 	#filenames = os.listdir(PATH) # returns list
 	
-	#PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	print "Loading data from PATH: " + PATH
+	print "Max Depth: " + str(maxDepth)
 	filenames = []
 	for i in range(12, 99):
 		filenames.append("hlist_0."+str(i)+"000.list")
 		#print PATH+"hlist_0."+str(i)+"000.list"
-	filenames.append("hlist_1.00000.list")
+	#filenames.append("hlist_1.00000.list")
 
 	initialDepthCount = 0
 	currentFileIndex = 0
@@ -72,6 +79,7 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 		if(startFileIndex > currentFileIndex or currentFileIndex > endFileIndex):
 			currentFileIndex = currentFileIndex + 1
 			continue
+		
 		fig = plt.figure()
 		p = fig.gca(projection='3d')
 		p.set_xlim(10, 50)
@@ -82,7 +90,7 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 		p.set_zlabel( "Z" )
 		mpl.rcParams['legend.fontsize'] = 10
 	
-		print "Loading file: "+str(currentFileIndex)+" '"+ file + "'"
+		print "["+str(datetime.datetime.now())+"] Loading file: "+str(currentFileIndex)+" '"+ file + "'"
 		data = tk.loadtxt(PATH+file)
 		
 		rk4pos = []
@@ -131,13 +139,16 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
 
 		if( spinPlot ):
-			p.view_init(elev=10., azim= currentFileIndex / 100.0 * 360)
+			p.view_init(elev=10., azim= currentFileIndex / 88.0 * 360)
 		else:
 			p.view_init(elev=10., azim=33)
 		
 		# Save figure
-		print "Generating figure: " + str(currentFileIndex)
+		print "["+str(datetime.datetime.now())+"] Generating figure: " + str(currentFileIndex)
 		plt.savefig("figure_"+str(currentFileIndex)+".png", transparent=True)
+		
+		# Clear plot for next time stamp
+		#plt.clf() # Clears plots
 		
 		initialDepthCount = initialDepthCount + 1
 		currentFileIndex = currentFileIndex + 1
@@ -206,31 +217,33 @@ def RK4(seed, step_size, num_steps, u, v, w):
 #loadData(maxDepth, startFile, endFileIndex)
 if len(sys.argv) == 2:
 	nPartitions = int(sys.argv[1])
+	
+	print 'nPartitions:', nPartitions
+if( len(sys.argv) == 4 ):
+	maxDepth = int(sys.argv[1])
+	startFileIndex = int(sys.argv[2])
+	endFileIndex = int(sys.argv[3])
 else:
 	print "Expecting 2 arguments: program, nPartitions"
+	print "or 4 arguments: program, maxDepth, startFileIndex, endFileIndex"
 	print "Received " + str(len(sys.argv))
 	sys.exit("Ending application")
 	
-print 'nPartitions:', nPartitions
 
-filenames = []
-for i in range(12, 100):
-	filenames.append("hlist_0."+str(i)+"000.list")
-filenames.append("hlist_1.00000.list")
 
-segmentsPerProcess = len(filenames) / nPartitions
-currentPart = 0
-processAssignments = {}
-for i in range(0,nPartitions):
-	print "Process " + str(i) + " will read data part " + str(currentPart) + " through " + str(currentPart+segmentsPerProcess)
-	processAssignments[i] = [currentPart, currentPart+segmentsPerProcess]
-	currentPart = currentPart+segmentsPerProcess+1
+#segmentsPerProcess = 88 / nPartitions
+#currentPart = 0
+#processAssignments = {}
+#for i in range(0,nPartitions):
+#	print "Process " + str(i) + " will read data part " + str(currentPart) + " through " + str(currentPart+segmentsPerProcess)
+#	processAssignments[i] = [currentPart, currentPart+segmentsPerProcess]
+#	currentPart = currentPart+segmentsPerProcess+1
 
-# haloParts = {}
-# for assignmentID in processAssignments:
-	# assignment = processAssignments[assignmentID]
-	# print "Process: " + str(assignmentID)
-	# haloParts[assignmentID] = loadData(0, assignment[0], assignment[1])
+#haloParts = {}
+#for assignmentID in processAssignments:
+#	assignment = processAssignments[assignmentID]
+#	print "Process: " + str(assignmentID)
+#	haloParts[assignmentID] = loadData(0, assignment[0], assignment[1])
 
 # mergedHalos = haloParts[0]
 # previousHaloList = mergedHalos
@@ -255,7 +268,7 @@ for i in range(0,nPartitions):
 				# curHaloPart[curHalo.nextDesc_id].rootHaloID = curHaloID
 		# previousHaloList = curHaloPart
 #initialHalos = mergedHalos
-initialHalos = loadData(3, 0, 100)
+initialHalos = loadData(maxDepth, startFileIndex, endFileIndex)
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
 print "Tracking " + str(len(initialHalos)) + " halos"
@@ -335,3 +348,8 @@ if( writeToFile ):
 	
 	# # Clear plot for next time stamp
 	# plt.clf() # Clears plots
+if( spinPlot ):
+	for t in range(0, 360):
+		p.view_init(elev=10., azim= 33+t)
+		print "["+str(datetime.datetime.now())+"] Generating figure: " + str(87+t)
+		plt.savefig("figure_"+str(87+t)+".png", transparent=True)
