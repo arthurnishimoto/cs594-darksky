@@ -30,10 +30,10 @@ plotRK4 = True # Process velocities using RK4 instead of using the provided posi
 euler = False # Process velocities using euler instead of RK4 (Requires plotRK4 to be enabled)
 
 # Render as an animation over time instead of showing all timesteps as a streamline
-showOverTime = False
+showOverTime = True
 
 # If showOverTime == true, also show previous timesteps instead of drawing only the current position
-showPrevTimeTrails = True
+showPrevTimeTrails = False
 
 spinPlot = False
 
@@ -44,6 +44,10 @@ endTime = 100 # there are 88 files total
 # Write halo positions
 writeToFile = False
 
+generateFigures = False
+
+nPartitions = 1
+
 # Globals --------------------------------------------------------------------------
 haloList = {}
 haloClusters = {}
@@ -53,7 +57,7 @@ p = fig.gca(projection='3d')
 # Load the data -------------------------------------------------------------------
 # Loads in the files and tracks halo descendant IDs of the host halo and allows the host
 # halo to track the position of all decendant halos over time 
-def loadData(maxDepth, startFileIndex, endFileIndex):
+def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 	global haloList
 	global haloClusters
 	global spinPlot
@@ -64,7 +68,7 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
 	#filenames = os.listdir(PATH) # returns list
 	
-	PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	#PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
 	print "Loading data from PATH: " + PATH
 	print "Max Depth: " + str(maxDepth)
 	filenames = []
@@ -79,22 +83,42 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 		if(startFileIndex > currentFileIndex or currentFileIndex > endFileIndex):
 			currentFileIndex = currentFileIndex + 1
 			continue
-		
-		fig = plt.figure()
-		p = fig.gca(projection='3d')
-		p.set_xlim(10, 50)
-		p.set_ylim(10, 50)
-		p.set_zlim(10, 50)
-		p.set_xlabel( "X" )
-		p.set_ylabel( "Y" )
-		p.set_zlabel( "Z" )
-		mpl.rcParams['legend.fontsize'] = 10
+
+		if( generateFigures ):
+			fig = plt.figure()
+			p = fig.gca(projection='3d')
+			#p.set_xlim(10, 50)
+			#p.set_ylim(10, 50)
+			#p.set_zlim(10, 50)
+			p.set_xlabel( "X" )
+			p.set_ylabel( "Y" )
+			p.set_zlabel( "Z" )
+			mpl.rcParams['legend.fontsize'] = 10
 	
 		print "["+str(datetime.datetime.now())+"] Loading file: "+str(currentFileIndex)+" '"+ file + "'"
 		data = tk.loadtxt(PATH+file)
 		
 		rk4pos = []
-		for halo in data:
+		dataLength = len(data)
+		
+		dataSegmentSize = dataLength / divisions
+		remainder = dataLength % divisions
+		print "Node: " + str(nodeID)
+		print "   Data length: " + str(dataLength)
+		print "   Data divisions: " + str(divisions)
+		print "   Data segment size: " + str(dataSegmentSize)
+		print "   remainder: " + str(remainder)
+		
+		startIndex = dataSegmentSize * nodeID
+		
+		if( nodeID == divisions - 1 ):
+			endIndex = (dataSegmentSize * (nodeID+1)) + remainder
+		else:
+			endIndex = (dataSegmentSize * (nodeID+1)) - 1
+			
+		print "   index: " + str(startIndex) + " to " + str(endIndex)
+		
+		for halo in data[startIndex:endIndex+1]:
 			# Add halo to dictionary
 			curHalo = Halo(halo)
 			if( curHalo.id in haloList ):
@@ -132,23 +156,25 @@ def loadData(maxDepth, startFileIndex, endFileIndex):
 						rk4x.append(rk4pos[index][0])
 						rk4y.append(rk4pos[index][1])
 						rk4z.append(rk4pos[index][2])
-					p.plot(rk4x[0:currentFileIndex], rk4y[0:currentFileIndex], rk4z[0:currentFileIndex])
-
+					if( generateFigures ):
+						#p.plot(rk4x[0:currentFileIndex], rk4y[0:currentFileIndex], rk4z[0:currentFileIndex])
+						p.plot([rk4x[currentFileIndex-1]], [rk4y[currentFileIndex-1]], [rk4z[currentFileIndex-1]])
 			if( initialDepthCount <= maxDepth ):
 				initialHalos[curHalo.id] = curHalo
 				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
-
-		if( spinPlot ):
-			p.view_init(elev=10., azim= currentFileIndex / 88.0 * 360)
-		else:
-			p.view_init(elev=10., azim=33)
+	
+		if( generateFigures ):
+			if( spinPlot ):
+				p.view_init(elev=10., azim= currentFileIndex / 88.0 * 360)
+			else:
+				p.view_init(elev=10., azim=33)
 		
-		# Save figure
-		print "["+str(datetime.datetime.now())+"] Generating figure: " + str(currentFileIndex)
-		plt.savefig("figure_"+str(currentFileIndex)+".png", transparent=True)
-		
-		# Clear plot for next time stamp
-		#plt.clf() # Clears plots
+			# Save figure
+			print "["+str(datetime.datetime.now())+"] Generating figure: " + str(currentFileIndex)
+			plt.savefig("figure_"+str(currentFileIndex)+".png", transparent=True)
+			
+			# Clear plot for next time stamp
+			plt.clf() # Clears plots
 		
 		initialDepthCount = initialDepthCount + 1
 		currentFileIndex = currentFileIndex + 1
@@ -214,142 +240,128 @@ def RK4(seed, step_size, num_steps, u, v, w):
 	return flowPos
 	
 # Program Specific ----- -----------------------------------------------------------
-#loadData(maxDepth, startFile, endFileIndex)
 if len(sys.argv) == 2:
 	nPartitions = int(sys.argv[1])
 	
 	print 'nPartitions:', nPartitions
-if( len(sys.argv) == 4 ):
+if( len(sys.argv) == 5 ):
 	maxDepth = int(sys.argv[1])
 	startFileIndex = int(sys.argv[2])
 	endFileIndex = int(sys.argv[3])
+	nPartitions = int(sys.argv[4])
 else:
 	print "Expecting 2 arguments: program, nPartitions"
-	print "or 4 arguments: program, maxDepth, startFileIndex, endFileIndex"
+	print "or 5 arguments: program, maxDepth, startFileIndex, endFileIndex, nPartitions"
 	print "Received " + str(len(sys.argv))
 	sys.exit("Ending application")
-	
 
+haloPartitions = {}
 
-#segmentsPerProcess = 88 / nPartitions
-#currentPart = 0
-#processAssignments = {}
-#for i in range(0,nPartitions):
-#	print "Process " + str(i) + " will read data part " + str(currentPart) + " through " + str(currentPart+segmentsPerProcess)
-#	processAssignments[i] = [currentPart, currentPart+segmentsPerProcess]
-#	currentPart = currentPart+segmentsPerProcess+1
+for partitionID in range(0, nPartitions):
+	print "Process: " + str(partitionID)
+	haloPartitions[partitionID] = loadData( partitionID, maxDepth, startFileIndex, endFileIndex, nPartitions)
 
-#haloParts = {}
-#for assignmentID in processAssignments:
-#	assignment = processAssignments[assignmentID]
-#	print "Process: " + str(assignmentID)
-#	haloParts[assignmentID] = loadData(0, assignment[0], assignment[1])
-
-# mergedHalos = haloParts[0]
-# previousHaloList = mergedHalos
-# for haloPartID in haloParts:
-	# if( haloPartID > 0 ):
-		# curHaloPart = haloParts[haloPartID]
-		# print "Merge Process result: " + str(haloPartID)
-		# for curHaloID in previousHaloList:
-			# curHalo = previousHaloList[curHaloID]
-			# if( curHaloPart[curHalo.nextDesc_id] != None ):
-				# if( curHalo.rootHaloID != -1 ):
-					# #print "Merged halo " + str(curHalo.nextDesc_id) + " with host " +  str(curHaloID)
-					# #print "Root " + str(curHaloPart[curHalo.nextDesc_id].nextDesc_id)
-					# mergedHalos[curHalo.rootHaloID].trackedPosX.extend( curHaloPart[curHalo.nextDesc_id].trackedPosX )
-					# mergedHalos[curHalo.rootHaloID].trackedPosY.extend( curHaloPart[curHalo.nextDesc_id].trackedPosY )
-					# mergedHalos[curHalo.rootHaloID].trackedPosZ.extend( curHaloPart[curHalo.nextDesc_id].trackedPosZ )
-				# else:
-					# #print "Added halo "+ str(curHaloID)
-					# mergedHalos[curHaloID] = curHalo
-					# mergedHalos[curHaloID] = curHalo
-					# mergedHalos[curHaloID] = curHalo
-				# curHaloPart[curHalo.nextDesc_id].rootHaloID = curHaloID
-		# previousHaloList = curHaloPart
-#initialHalos = mergedHalos
-initialHalos = loadData(maxDepth, startFileIndex, endFileIndex)
 print "Loaded " + str(len(haloList)) + " halos"
 print "Counted " + str(len(haloClusters)) + " with children"
-print "Tracking " + str(len(initialHalos)) + " halos"
 
-if( writeToFile ):
-	resultsPath = "./results/"
+#( writeToFile ):
+
+mergedHaloList = {}
+
+print "Merging halo lists"
+for partitionID in haloPartitions:
+	currentHaloList = haloPartitions[partitionID]
+	for haloID in currentHaloList:
+		curhalo = currentHaloList[haloID]
+		
+		if( haloID in mergedHaloList):
+			print "Existing halo " + str(curhalo.id) + " found" # This dosen't happen
+		else:
+			mergedHaloList[haloID] = curhalo
+			
+print "Merged " + str(len(mergedHaloList)) + " halos"
+for haloID in mergedHaloList:
+	curhalo = mergedHaloList[haloID]
+	
+	f = open('./position_results/positions_halo_'+str(haloID), 'w')
+	for i in range(0, len(curhalo.trackedPosX)):
+		x = curhalo.trackedPosX[int(i)]
+		y = curhalo.trackedPosY[int(i)]
+		z = curhalo.trackedPosZ[int(i)]
+		f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+"\n")
+	f.close()
+
+sys.exit()
+
+for t in range(startTime, endTime):
+	fig = plt.figure()
+	
+	p = fig.gca(projection='3d')
+	p.set_xlim(45, 60)
+	p.set_ylim(10, 60)
+	p.set_zlim(40, 60)
+	p.set_xlabel( "X" )
+	p.set_ylabel( "Y" )
+	p.set_zlabel( "Z" )
+	mpl.rcParams['legend.fontsize'] = 10
+
 	for initHaloID in initialHalos:
-		curhalo = initialHalos[initHaloID]
-		f = open('positions_halo_'+str(initHaloID), 'w')
-		for i in curhalo.trackedPosX:
-			x = curhalo.trackedPosX[int(i)]
-			y = curhalo.trackedPosY[int(i)]
-			z = curhalo.trackedPosZ[int(i)]
-			f.write(str(x) + " " + str(y) + " " + str(z)+"\n")
-		f.close()
-
-# for t in range(startTime, endTime):
-	# fig = plt.figure()
-	
-	# p = fig.gca(projection='3d')
-	# p.set_xlim(10, 50)
-	# p.set_ylim(10, 50)
-	# p.set_zlim(10, 50)
-	# p.set_xlabel( "X" )
-	# p.set_ylabel( "Y" )
-	# p.set_zlabel( "Z" )
-	# mpl.rcParams['legend.fontsize'] = 10
-
-	# for initHaloID in initialHalos:
-		# curHalo = initialHalos[initHaloID]
+		curHalo = initialHalos[initHaloID]
 		
-		# # RK4
-		# if( plotRK4 ):
-			# initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
-			# rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
+		# RK4
+		if( plotRK4 ):
+			initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
+			rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
 			
-			# # Format for plot
-			# rk4x = []
-			# rk4y = []
-			# rk4z = []
-			# for index in range(0,len(rk4pos)):
-				# rk4x.append(rk4pos[index][0])
-				# rk4y.append(rk4pos[index][1])
-				# rk4z.append(rk4pos[index][2])
+			# Format for plot
+			rk4x = []
+			rk4y = []
+			rk4z = []
+			for index in range(0,len(rk4pos)):
+				rk4x.append(rk4pos[index][0])
+				rk4y.append(rk4pos[index][1])
+				rk4z.append(rk4pos[index][2])
 				
-			# title = str(curHalo.id) + " (RK4)"
+			title = str(curHalo.id) + " (RK4)"
 			
-			# if( showOverTime ):
-				# if( showPrevTimeTrails ):
-					# p.plot(rk4x[0:t], rk4y[0:t], rk4z[0:t], label=title)
-				# else:
-					# p.plot(rk4x[t], rk4y[t], rk4z[t], label=title)
-			# else:
-				# p.plot(rk4x, rk4y, rk4z, label=title)
+			if( rk4pos[index][0] > 50 and rk4pos[index][2] > 40 ):
+				if( showOverTime ):
+					if( showPrevTimeTrails ):
+						p.plot(rk4x[0:t], rk4y[0:t], rk4z[0:t], label=title)
+					else:
+						p.plot([rk4x[t]], [rk4y[t]], [rk4z[t]], label=title)
+				else:
+					p.plot(rk4x, rk4y, rk4z, label=title)
 				
-		# else:
-			# title = str(curHalo.id) + ""
+		else:
+			title = str(curHalo.id) + ""
 			
-			# # Plot time from 0 to time t
-			# if( showOverTime ):
-				# if( showPrevTimeTrails ):
-					# p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
-				# else:
-					# p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
-			# else:
-				# p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+			# Plot time from 0 to time t
+			if( showOverTime ):
+				if( showPrevTimeTrails ):
+					p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
+				else:
+					p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
+			else:
+				p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
 	
-	# # use this to spin the plot
-	# if( spinPlot ):
-		# p.view_init(elev=10., azim= t / 100.0 * 360)
-	# else:
-		# p.view_init(elev=10., azim=33)
+	# use this to spin the plot
+	if( spinPlot ):
+		p.view_init(elev=10., azim= t / 100.0 * 360)
+	else:
+		p.view_init(elev=10., azim=33)
 		
-	# # Save figure
-	# print "Generating figure: " + str(t)
-	# plt.savefig("figure_"+str(t)+".png", transparent=True)
+	# Save figure
+	print "Generating figure: " + str(t)
+	plt.savefig("figure_"+str(t)+".png", transparent=True)
 	
-	# # Clear plot for next time stamp
-	# plt.clf() # Clears plots
+	# Clear plot for next time stamp
+	plt.clf() # Clears plots
 if( spinPlot ):
 	for t in range(0, 360):
 		p.view_init(elev=10., azim= 33+t)
 		print "["+str(datetime.datetime.now())+"] Generating figure: " + str(87+t)
 		plt.savefig("figure_"+str(87+t)+".png", transparent=True)
+		
+#p.legend()
+#plt.show()
