@@ -75,11 +75,11 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 	
 	initialHalos = {}
 	
-	#PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
+	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
 	#filenames = os.listdir(PATH) # returns list
 	
-	PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
-	PATH = "/iridium_SSD/luc/Scivis2015/data/rockstar/hlists/"
+	#PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	#PATH = "/iridium_SSD/luc/Scivis2015/data/rockstar/hlists/"
 	print "Loading data from PATH: " + PATH
 	print "Max Depth: " + str(maxDepth)
 	filenames = []
@@ -151,13 +151,19 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 			else:
 				haloList[curHalo.id] = curHalo
 				initialHalos[curHalo.id] = curHalo
-				initialHalos[curHalo.id].trackedPosX.append( curHalo.position[0] )
-				initialHalos[curHalo.id].trackedPosY.append( curHalo.position[1] )
-				initialHalos[curHalo.id].trackedPosZ.append( curHalo.position[2] )
-							
-				initialHalos[curHalo.id].trackedVelX.append( curHalo.velocity[0] )
-				initialHalos[curHalo.id].trackedVelY.append( curHalo.velocity[1] )
-				initialHalos[curHalo.id].trackedVelZ.append( curHalo.velocity[2] )
+				#initialHalos[curHalo.id].trackedPosX.append( curHalo.position[0] )
+				#initialHalos[curHalo.id].trackedPosY.append( curHalo.position[1] )
+				#initialHalos[curHalo.id].trackedPosZ.append( curHalo.position[2] )
+				
+				#initialHalos[curHalo.id].trackedVelX.append( curHalo.velocity[0] )
+				#initialHalos[curHalo.id].trackedVelY.append( curHalo.velocity[1] )
+				#initialHalos[curHalo.id].trackedVelZ.append( curHalo.velocity[2] )
+				
+				nextPos = np.array([[curHalo.position[0]], [curHalo.position[1]], [curHalo.position[2]]])
+				initialHalos[curHalo.id].trackedPos = nextPos
+				
+				nextVel = np.array([[curHalo.velocity[0]], [curHalo.velocity[1]], [curHalo.velocity[2]]])
+				initialHalos[curHalo.id].trackedVel = nextVel
 					
 				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
 				initialHalos[curHalo.id].processID = nodeID
@@ -171,19 +177,27 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 			#if( curHalo.desc_id != -1 ):
 			for initHaloID in initialHalos:
 				if( initialHalos[initHaloID].nextDesc_id == curHalo.id ):
-					initialHalos[initHaloID].trackedPosX.append( curHalo.position[0] )
-					initialHalos[initHaloID].trackedPosY.append( curHalo.position[1] )
-					initialHalos[initHaloID].trackedPosZ.append( curHalo.position[2] )
-							
-					initialHalos[initHaloID].trackedVelX.append( curHalo.velocity[0] )
-					initialHalos[initHaloID].trackedVelY.append( curHalo.velocity[1] )
-					initialHalos[initHaloID].trackedVelZ.append( curHalo.velocity[2] )
+					#initialHalos[curHalo.id].trackedPosX.append( curHalo.position[0] )
+					#initialHalos[curHalo.id].trackedPosY.append( curHalo.position[1] )
+					#initialHalos[curHalo.id].trackedPosZ.append( curHalo.position[2] )
 					
+					#initialHalos[curHalo.id].trackedVelX.append( curHalo.velocity[0] )
+					#initialHalos[curHalo.id].trackedVelY.append( curHalo.velocity[1] )
+					#initialHalos[curHalo.id].trackedVelZ.append( curHalo.velocity[2] )
+
+					nextPos = np.array([[curHalo.position[0]], [curHalo.position[1]], [curHalo.position[2]]])
+					initialHalos[initHaloID].trackedPos = np.concatenate((initialHalos[initHaloID].trackedPos, nextPos), axis=1)
+					
+					nextVel = np.array([[curHalo.velocity[0]], [curHalo.velocity[1]], [curHalo.velocity[2]]])
+					initialHalos[initHaloID].trackedVel = np.concatenate((initialHalos[initHaloID].trackedVel, nextVel), axis=1)
+
 					initialHalos[initHaloID].nextDesc_id = curHalo.desc_id
 					initialHalos[initHaloID].processID = nodeID
 					
-					initPos = [initialHalos[initHaloID].trackedPosX[0],initialHalos[initHaloID].trackedPosY[0], initialHalos[initHaloID].trackedPosZ[0]];
-					rk4pos = RK4( initPos, 1, 1000, initialHalos[initHaloID].trackedVelX, initialHalos[initHaloID].trackedVelY, initialHalos[initHaloID].trackedVelZ );
+					print initHaloID
+					print initialHalos[initHaloID].trackedPos
+					initPos = [initialHalos[initHaloID].trackedPos[0][0],initialHalos[initHaloID].trackedPos[1][0], initialHalos[initHaloID].trackedPos[2][0]];
+					rk4pos = RK4( initPos, 1, 1000, initialHalos[initHaloID].trackedVel[0][:], initialHalos[initHaloID].trackedVel[1][:], initialHalos[initHaloID].trackedVel[2][:] );
 					
 					# Format for plot
 					rk4x = []
@@ -330,10 +344,11 @@ for haloID in mergedHaloList:
 		#if( haloID == 4 ):
 		#	print "Opening halo 4"
 		f.write("# Halo ID: "+str(curhalo.id)+ " NextID: " + str(curhalo.nextDesc_id)+"\n")
-		for i in range(0, len(curhalo.trackedPosX)):
-			x = curhalo.trackedPosX[int(i)]
-			y = curhalo.trackedPosY[int(i)]
-			z = curhalo.trackedPosZ[int(i)]
+
+		for i in range(0, len(curhalo.trackedPos[0])):
+			x = curhalo.trackedPos[0][int(i)]
+			y = curhalo.trackedPos[1][int(i)]
+			z = curhalo.trackedPos[2][int(i)]
 			f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+ " " + str(curhalo.processID)+"\n")
 			#if( haloID == 4 ):
 			#	print str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+ " " + str(curhalo.processID)
@@ -353,10 +368,10 @@ for haloID in mergedHaloList:
 			#print " adding " + str( len(nextHalo.trackedPosX) )
 			
 			
-			for i in range(0, len(nextHalo.trackedPosX)):
-				x = nextHalo.trackedPosX[int(i)]
-				y = nextHalo.trackedPosY[int(i)]
-				z = nextHalo.trackedPosZ[int(i)]
+			for i in range(0, len(nextHalo.trackedPos[0])):
+				x = curhalo.trackedPos[0][int(i)]
+				y = curhalo.trackedPos[1][int(i)]
+				z = curhalo.trackedPos[2][int(i)]
 				f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(nextHalo.id) + " " + str(nextHalo.nextDesc_id)+ " " + str(nextHalo.processID)+"\n")
 				#if( haloID == 4 ):
 				#	print str(x) + " " + str(y) + " " + str(z)+" "+str(nextHalo.id) + " " + str(nextHalo.nextDesc_id)+ " " + str(nextHalo.processID)

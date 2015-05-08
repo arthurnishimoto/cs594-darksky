@@ -5,6 +5,8 @@
 # System: Windows 8.1, Python 2.7.8 (Anaconda 2.1.0 - x64), VTK 6.1.0 (x64)
 # Author: Arthur Nishimoto (anishi2)
 
+import numpy as np
+
 class Halo:
     def __init__(self, data):
 		self.data = "hello";
@@ -68,11 +70,6 @@ class Halo:
 		self.rootHaloID = -1
 		
 		self.nextDesc_id = -1
-		self.trackedPosX = []
-		self.trackedPosY = []
-		self.trackedPosZ = []
-		
-		self.trackedVelX = []
-		self.trackedVelY = []
-		self.trackedVelZ = []
-		
+
+		self.trackedPos = np.empty(0)
+		self.trackedVel = np.empty(0)
