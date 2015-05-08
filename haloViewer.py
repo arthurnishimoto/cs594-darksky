@@ -5,16 +5,24 @@
 # System: Windows 8.1, Python 2.7.8 (Anaconda 2.1.0 - x64), VTK 6.1.0 (x64)
 # Author: Arthur Nishimoto (anishi2)
 
-import thingking as tk  # loadtxt
+#import thingking as tk  # loadtxt
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 import sys
 import datetime
+import urllib2
 
 from Halo import Halo
 from mpl_toolkits.mplot3d import Axes3D
+
+#from mpi4py import MPI
+
+#comm = MPI.COMM_WORLD
+#size = MPI.COMM_WORLD.Get_size()
+#rank = comm.Get_rank()
+#name = MPI.Get_processor_name()
 
 # Settings ------------------------------------------------------------------------
 # Number of timesteps deep to connect descendant halos to parent
@@ -51,8 +59,10 @@ nPartitions = 1
 # Globals --------------------------------------------------------------------------
 haloList = {}
 haloClusters = {}
-fig = plt.figure()
-p = fig.gca(projection='3d')
+
+if( generateFigures ):
+	fig = plt.figure()
+	p = fig.gca(projection='3d')
 
 # Load the data -------------------------------------------------------------------
 # Loads in the files and tracks halo descendant IDs of the host halo and allows the host
@@ -65,10 +75,11 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 	
 	initialHalos = {}
 	
-	PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
+	#PATH = "C:/Workspace/cs594/Project/data/rockstar/hlists/"
 	#filenames = os.listdir(PATH) # returns list
 	
-	#PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	PATH = "http://darksky.slac.stanford.edu/scivis2015/data/ds14_scivis_0128/rockstar/hlists/"
+	PATH = "/iridium_SSD/luc/Scivis2015/data/rockstar/hlists/"
 	print "Loading data from PATH: " + PATH
 	print "Max Depth: " + str(maxDepth)
 	filenames = []
@@ -96,7 +107,18 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 			mpl.rcParams['legend.fontsize'] = 10
 	
 		print "["+str(datetime.datetime.now())+"] Loading file: "+str(currentFileIndex)+" '"+ file + "'"
-		data = tk.loadtxt(PATH+file)
+		
+		# Read the file
+		#data = tk.loadtxt(PATH+file)
+		
+		 # Parsing alternate to thingking ###
+		data = []
+		f = open(PATH+file, 'r')
+		#f = urllib2.urlopen(PATH+file)
+		for line in f:
+			if( not "#" in line ):
+				data.append(line)
+		# ######################
 		
 		rk4pos = []
 		dataLength = len(data)
@@ -119,13 +141,27 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 		print "   index: " + str(startIndex) + " to " + str(endIndex)
 		
 		for halo in data[startIndex:endIndex+1]:
+		
+			halo = halo.split() # Parsing alternate to thingking
+			
 			# Add halo to dictionary
 			curHalo = Halo(halo)
 			if( curHalo.id in haloList ):
 				print "Existing halo " + str(curHalo.id) + " found" # This dosen't happen
 			else:
 				haloList[curHalo.id] = curHalo
-			
+				initialHalos[curHalo.id] = curHalo
+				initialHalos[curHalo.id].trackedPosX.append( curHalo.position[0] )
+				initialHalos[curHalo.id].trackedPosY.append( curHalo.position[1] )
+				initialHalos[curHalo.id].trackedPosZ.append( curHalo.position[2] )
+							
+				initialHalos[curHalo.id].trackedVelX.append( curHalo.velocity[0] )
+				initialHalos[curHalo.id].trackedVelY.append( curHalo.velocity[1] )
+				initialHalos[curHalo.id].trackedVelZ.append( curHalo.velocity[2] )
+					
+				initialHalos[curHalo.id].nextDesc_id = curHalo.desc_id
+				initialHalos[curHalo.id].processID = nodeID
+					
 			# If halo has a host ID, append it to the host halos's client list
 			if( curHalo.pid in haloList ):
 				haloList[curHalo.pid].clients[curHalo.id] = curHalo
@@ -144,6 +180,7 @@ def loadData(nodeID, maxDepth, startFileIndex, endFileIndex, divisions):
 					initialHalos[initHaloID].trackedVelZ.append( curHalo.velocity[2] )
 					
 					initialHalos[initHaloID].nextDesc_id = curHalo.desc_id
+					initialHalos[initHaloID].processID = nodeID
 					
 					initPos = [initialHalos[initHaloID].trackedPosX[0],initialHalos[initHaloID].trackedPosY[0], initialHalos[initHaloID].trackedPosZ[0]];
 					rk4pos = RK4( initPos, 1, 1000, initialHalos[initHaloID].trackedVelX, initialHalos[initHaloID].trackedVelY, initialHalos[initHaloID].trackedVelZ );
@@ -261,107 +298,144 @@ for partitionID in range(0, nPartitions):
 	print "Process: " + str(partitionID)
 	haloPartitions[partitionID] = loadData( partitionID, maxDepth, startFileIndex, endFileIndex, nPartitions)
 
-print "Loaded " + str(len(haloList)) + " halos"
-print "Counted " + str(len(haloClusters)) + " with children"
+# if( rank != 0 ):
+	# haloNodeData = loadData( rank, maxDepth, startFileIndex, endFileIndex, nPartitions)
 
-#( writeToFile ):
-
-mergedHaloList = {}
-
+	# comm.Send(haloNodeData, dest=0, tag=67)
+# else:
+	# mergedHaloList = {}
+	# for i in range(0,nPartitions):
+		# # Set the data buffer and wait for data
+		# mergedHaloList[i] = comm.Recv(source=i, tag=67)
+mergedHaloList = {}	
 print "Merging halo lists"
 for partitionID in haloPartitions:
 	currentHaloList = haloPartitions[partitionID]
 	for haloID in currentHaloList:
 		curhalo = currentHaloList[haloID]
-		
+		curhalo.mergedWithRoot = False
 		if( haloID in mergedHaloList):
 			print "Existing halo " + str(curhalo.id) + " found" # This dosen't happen
 		else:
 			mergedHaloList[haloID] = curhalo
 			
 print "Merged " + str(len(mergedHaloList)) + " halos"
+print "Combining descendants with parent halos"
 for haloID in mergedHaloList:
 	curhalo = mergedHaloList[haloID]
 	
-	f = open('./position_results/positions_halo_'+str(haloID), 'w')
-	for i in range(0, len(curhalo.trackedPosX)):
-		x = curhalo.trackedPosX[int(i)]
-		y = curhalo.trackedPosY[int(i)]
-		z = curhalo.trackedPosZ[int(i)]
-		f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+"\n")
+	if( curhalo.mergedWithRoot == False ):
+		f = open('./position_results/positions_halo_'+str(haloID), 'w')
+		
+		#if( haloID == 4 ):
+		#	print "Opening halo 4"
+		f.write("# Halo ID: "+str(curhalo.id)+ " NextID: " + str(curhalo.nextDesc_id)+"\n")
+		for i in range(0, len(curhalo.trackedPosX)):
+			x = curhalo.trackedPosX[int(i)]
+			y = curhalo.trackedPosY[int(i)]
+			z = curhalo.trackedPosZ[int(i)]
+			f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+ " " + str(curhalo.processID)+"\n")
+			#if( haloID == 4 ):
+			#	print str(x) + " " + str(y) + " " + str(z)+" "+str(curhalo.id) + " " + str(curhalo.nextDesc_id)+ " " + str(curhalo.processID)
+		
+		while( curhalo.nextDesc_id in mergedHaloList ):
+			nextHalo = mergedHaloList[curhalo.nextDesc_id]
+			
+			#if( haloID == 4 ):
+			#	print "Merging halo 4 with " + str( curhalo.nextDesc_id );
+			
+			# Once parent merges data with descendant, don't generate new file for descendant
+			mergedHaloList[curhalo.nextDesc_id].mergedWithRoot = True
+			
+			# Set root's next id to descendant's next id
+			curhalo.nextDesc_id = nextHalo.nextDesc_id
+			#print "Found descendant halo " + str(curhalo.nextDesc_id) + " of root " + str(curhalo.id)
+			#print " adding " + str( len(nextHalo.trackedPosX) )
+			
+			
+			for i in range(0, len(nextHalo.trackedPosX)):
+				x = nextHalo.trackedPosX[int(i)]
+				y = nextHalo.trackedPosY[int(i)]
+				z = nextHalo.trackedPosZ[int(i)]
+				f.write(str(x) + " " + str(y) + " " + str(z)+" "+str(nextHalo.id) + " " + str(nextHalo.nextDesc_id)+ " " + str(nextHalo.processID)+"\n")
+				#if( haloID == 4 ):
+				#	print str(x) + " " + str(y) + " " + str(z)+" "+str(nextHalo.id) + " " + str(nextHalo.nextDesc_id)+ " " + str(nextHalo.processID)
+	#else:
+	#	print "Compared descendant halo " + str(curhalo.nextDesc_id) + " of root " + str(curhalo.id)
+	
 	f.close()
 
 sys.exit()
 
-for t in range(startTime, endTime):
-	fig = plt.figure()
+# for t in range(startTime, endTime):
+	# fig = plt.figure()
 	
-	p = fig.gca(projection='3d')
-	p.set_xlim(45, 60)
-	p.set_ylim(10, 60)
-	p.set_zlim(40, 60)
-	p.set_xlabel( "X" )
-	p.set_ylabel( "Y" )
-	p.set_zlabel( "Z" )
-	mpl.rcParams['legend.fontsize'] = 10
+	# p = fig.gca(projection='3d')
+	# p.set_xlim(45, 60)
+	# p.set_ylim(10, 60)
+	# p.set_zlim(40, 60)
+	# p.set_xlabel( "X" )
+	# p.set_ylabel( "Y" )
+	# p.set_zlabel( "Z" )
+	# mpl.rcParams['legend.fontsize'] = 10
 
-	for initHaloID in initialHalos:
-		curHalo = initialHalos[initHaloID]
+	# for initHaloID in initialHalos:
+		# curHalo = initialHalos[initHaloID]
 		
-		# RK4
-		if( plotRK4 ):
-			initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
-			rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
+		# # RK4
+		# if( plotRK4 ):
+			# initPos = [curHalo.trackedPosX[0],curHalo.trackedPosY[0], curHalo.trackedPosZ[0]];
+			# rk4pos = RK4( initPos, 1, 1000, curHalo.trackedVelX, curHalo.trackedVelY, curHalo.trackedVelZ );
 			
-			# Format for plot
-			rk4x = []
-			rk4y = []
-			rk4z = []
-			for index in range(0,len(rk4pos)):
-				rk4x.append(rk4pos[index][0])
-				rk4y.append(rk4pos[index][1])
-				rk4z.append(rk4pos[index][2])
+			# # Format for plot
+			# rk4x = []
+			# rk4y = []
+			# rk4z = []
+			# for index in range(0,len(rk4pos)):
+				# rk4x.append(rk4pos[index][0])
+				# rk4y.append(rk4pos[index][1])
+				# rk4z.append(rk4pos[index][2])
 				
-			title = str(curHalo.id) + " (RK4)"
+			# title = str(curHalo.id) + " (RK4)"
 			
-			if( rk4pos[index][0] > 50 and rk4pos[index][2] > 40 ):
-				if( showOverTime ):
-					if( showPrevTimeTrails ):
-						p.plot(rk4x[0:t], rk4y[0:t], rk4z[0:t], label=title)
-					else:
-						p.plot([rk4x[t]], [rk4y[t]], [rk4z[t]], label=title)
-				else:
-					p.plot(rk4x, rk4y, rk4z, label=title)
+			# if( rk4pos[index][0] > 50 and rk4pos[index][2] > 40 ):
+				# if( showOverTime ):
+					# if( showPrevTimeTrails ):
+						# p.plot(rk4x[0:t], rk4y[0:t], rk4z[0:t], label=title)
+					# else:
+						# p.plot([rk4x[t]], [rk4y[t]], [rk4z[t]], label=title)
+				# else:
+					# p.plot(rk4x, rk4y, rk4z, label=title)
 				
-		else:
-			title = str(curHalo.id) + ""
+		# else:
+			# title = str(curHalo.id) + ""
 			
-			# Plot time from 0 to time t
-			if( showOverTime ):
-				if( showPrevTimeTrails ):
-					p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
-				else:
-					p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
-			else:
-				p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
+			# # Plot time from 0 to time t
+			# if( showOverTime ):
+				# if( showPrevTimeTrails ):
+					# p.plot(curHalo.trackedPosX[0:t], curHalo.trackedPosY[0:t], curHalo.trackedPosZ[0:t], label=title)
+				# else:
+					# p.plot(curHalo.trackedPosX[t], curHalo.trackedPosY[t], curHalo.trackedPosZ[t], label=title)
+			# else:
+				# p.plot(curHalo.trackedPosX, curHalo.trackedPosY, curHalo.trackedPosZ, label=title)
 	
-	# use this to spin the plot
-	if( spinPlot ):
-		p.view_init(elev=10., azim= t / 100.0 * 360)
-	else:
-		p.view_init(elev=10., azim=33)
+	# # use this to spin the plot
+	# if( spinPlot ):
+		# p.view_init(elev=10., azim= t / 100.0 * 360)
+	# else:
+		# p.view_init(elev=10., azim=33)
 		
-	# Save figure
-	print "Generating figure: " + str(t)
-	plt.savefig("figure_"+str(t)+".png", transparent=True)
+	# # Save figure
+	# print "Generating figure: " + str(t)
+	# plt.savefig("figure_"+str(t)+".png", transparent=True)
 	
-	# Clear plot for next time stamp
-	plt.clf() # Clears plots
-if( spinPlot ):
-	for t in range(0, 360):
-		p.view_init(elev=10., azim= 33+t)
-		print "["+str(datetime.datetime.now())+"] Generating figure: " + str(87+t)
-		plt.savefig("figure_"+str(87+t)+".png", transparent=True)
+	# # Clear plot for next time stamp
+	# plt.clf() # Clears plots
+# if( spinPlot ):
+	# for t in range(0, 360):
+		# p.view_init(elev=10., azim= 33+t)
+		# print "["+str(datetime.datetime.now())+"] Generating figure: " + str(87+t)
+		# plt.savefig("figure_"+str(87+t)+".png", transparent=True)
 		
 #p.legend()
 #plt.show()

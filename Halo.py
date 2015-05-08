@@ -25,9 +25,9 @@ class Halo:
 		self.mmp = data[14] #mmp?: whether the halo is the most massive progenitor or not.
 		self.scale_of_last_MM = data[15] #scale_of_last_MM: scale factor of the last major merger (Mass ratio > 0.3).
 		self.vmax = data[16] #Vmax: Maxmimum circular velocity (km/s physical).
-		self.position = [data[17], data[18], data[19]] #X/Y/Z: Halo position (Mpc/h comoving).
-		self.velocity = [data[20], data[21], data[22]] #VX/VY/VZ: Halo velocity (km/s physical).
-		self.angVel = [data[23], data[24], data[25]] #JX/JY/JZ: Halo angular momenta ((Msun/h) * (Mpc/h) * km/s (physical)).
+		self.position = [float(data[17]), float(data[18]), float(data[19])] #X/Y/Z: Halo position (Mpc/h comoving).
+		self.velocity = [float(data[20]), float(data[21]), float(data[22])] #VX/VY/VZ: Halo velocity (km/s physical).
+		self.angVel = [float(data[23]), float(data[24]), float(data[25])] #JX/JY/JZ: Halo angular momenta ((Msun/h) * (Mpc/h) * km/s (physical)).
 		self.Spin = data[26] #Spin: Halo spin parameter.
 		self.Breadth_first_ID = data[27] #Breadth_first_ID: breadth-first ordering of halos within a tree.
 		self.Depth_first_ID = data[28] #Depth_first_ID: depth-first ordering of halos within a tree.
